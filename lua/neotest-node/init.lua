@@ -121,14 +121,21 @@ end
 ---@param args neotest.RunArgs
 ---@return nil | neotest.RunSpec | neotest.RunSpec[]
 function NodeNeotestAdapter.build_spec(args)
-	local results_path = async.fn.tempname()
 	if not args.tree then
 		return
 	end
 	local position = args.tree:data()
 	local cwd = assert(NodeNeotestAdapter.root(position.path), "could not locate root directory of " .. position.path)
 
-	local command = { "node", "--test", "--test-reporter", "tap" }
+	local results_path = async.fn.tempname()
+	local command = {
+		"node",
+		"--test",
+		"--test-reporter",
+		"tap",
+		"--test-reporter-destination",
+		results_path,
+	}
 	if position.type == "test" or position.type == "namespace" then
 		vim.list_extend(command, {
 			"--test-name-pattern",
@@ -156,8 +163,19 @@ end
 ---@param tree neotest.Tree
 ---@return table<string, neotest.Result>
 function NodeNeotestAdapter.results(spec, result, tree)
-	-- TODO:
-	return {}
+	---@type table<string, neotest.Result>
+	local results = {}
+	local file = assert(io.open(spec.context.results_path), "Unable to open results file")
+	local line = file:read("l")
+	assert(line == "TAP version 13", "Incorrect TAP header version in reporter")
+	while line do
+		-- TODO: actually parse the file
+		line = file:read("l")
+	end
+	if file then
+		file:close()
+	end
+	return results
 end
 
 return NodeNeotestAdapter
