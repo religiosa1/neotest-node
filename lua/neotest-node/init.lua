@@ -1,6 +1,7 @@
 -- see https://github.com/nvim-neotest/neotest/blob/master/lua/neotest/adapters/interface.lua
 local lib = require("neotest.lib")
 local async = require("neotest.async")
+local TapParser = require("neotest-node.node-tap-parser")
 
 local NodeNeotestAdapter = { name = "neotest-node" }
 
@@ -13,7 +14,7 @@ local test_filename_re = ".*%.test%.[tj]s$"
 ---@param dir string @Directory to treat as cwd
 ---@return string | nil @Absolute root dir of test suite
 function NodeNeotestAdapter.root(dir)
-	return lib.files.match_root_pattern("package.json")(dir)
+	return lib.files.match_root_pattern("package.json")(dir) or dir
 end
 
 ---Filter directories when searching for test files
@@ -146,14 +147,29 @@ function NodeNeotestAdapter.build_spec(args)
 	elseif position.type == "file" then
 		table.insert(command, position.path)
 	elseif position.type == "dir" then
-		table.insert(command, all_tests_shell_pattern)
+		-- TODO: this will require custom reporter for node -- extension for
+		-- TAP reporter, that also gives info on locations
+		assert(false, "DIR tests are not supported yet")
+		table.insert(command, position.path .. "/" .. all_tests_shell_pattern)
 	end
+
+	local parser = TapParser.new(position.path, results_path)
 	return {
 		command = command,
 		context = {
 			results_path = results_path,
+			parser = parser,
 		},
 		cwd = cwd,
+		stream = function(output_stream)
+			return function()
+				local new_lines = output_stream()
+				for _, line in ipairs(new_lines) do
+					parser:parse_line(line)
+				end
+				return parser:get_results()
+			end
+		end,
 	}
 end
 
@@ -163,19 +179,34 @@ end
 ---@param tree neotest.Tree
 ---@return table<string, neotest.Result>
 function NodeNeotestAdapter.results(spec, result, tree)
-	---@type table<string, neotest.Result>
-	local results = {}
-	local file = assert(io.open(spec.context.results_path), "Unable to open results file")
-	local line = file:read("l")
-	assert(line == "TAP version 13", "Incorrect TAP header version in reporter")
-	while line do
-		-- TODO: actually parse the file
-		line = file:read("l")
-	end
-	if file then
-		file:close()
-	end
-	return results
+	local parser = spec.context.parser
+	assert(parser, "Unable to extract reporter parser for test results retrieval from test context")
+	return parser:get_results()
+
+	-- vim.print(g_positions)
+	-- results["/home/religiosa/projects/blueprint-mozio/packages/blueprint-mozio-backend/src/emailTemplates/html.test.ts::html"] =
+	-- 	{
+	-- 		status = "failed",
+	-- 		short = "html: passed",
+	-- 		output = "/home/religiosa/projects/blueprint-mozio/packages/blueprint-mozio-backend/blah1",
+	-- 	}
+	-- results["/home/religiosa/projects/blueprint-mozio/packages/blueprint-mozio-backend/src/emailTemplates/html.test.ts::html::renders provided html as a string"] =
+	-- 	{
+	-- 		status = "failed",
+	-- 		short = "failed",
+	-- 		output = "/home/religiosa/projects/blueprint-mozio/packages/blueprint-mozio-backend/blah2",
+	-- 		errors = {
+	-- 			{
+	-- 				message = "qwert dsf asd msg",
+	-- 				line = 5,
+	-- 				-- severity = vim.diagnostic.severity.ERROR
+	-- 			},
+	-- 		},
+	-- 	}
+	-- results["/home/religiosa/projects/blueprint-mozio/packages/blueprint-mozio-backend/src/emailTemplates/html.test.ts::html::escapes provided values"] =
+	-- 	{ status = "skipped", short = "mnbv" }
+	-- results["/home/religiosa/projects/blueprint-mozio/packages/blueprint-mozio-backend/src/emailTemplates/html.test.ts::html::doesn't escape raw values"] =
+	-- 	{ status = "passed", short = "zxcv" }
 end
 
 return NodeNeotestAdapter

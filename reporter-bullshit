@@ -1,0 +1,91 @@
+https://raw.githubusercontent.com/nodejs/node/main/lib/internal/test_runner/reporter/tap.js
+  Option 1: Inject Location Comments (Recommended)
+
+  You can create a lightweight custom reporter that injects location comments into TAP output:
+
+  // neotest-tap-with-location.js
+  export default async function* neotestTap(source) {
+    yield 'TAP version 13\n';
+
+    let count = 0;
+    let pass = 0;
+    let fail = 0;
+
+    for await (const { type, data } of source) {
+      switch (type) {
+        case 'test:pass':
+        case 'test:fail':
+          count++;
+          const status = type === 'test:pass' ? 'ok' : 'not ok';
+          if (type === 'test:pass') pass++;
+          else fail++;
+
+          // INJECT LOCATION COMMENT
+          yield `# location: ${data.file}:${data.line}:${data.column}\n`;
+          yield `${status} ${count} - ${data.name}\n`;
+
+          // Add error details for failures
+          if (type === 'test:fail' && data.details?.error) {
+            yield `  ---\n`;
+            yield `  error: '${data.details.error.message}'\n`;
+            yield `  ...\n`;
+          }
+          break;
+
+        case 'test:diagnostic':
+          yield `# ${data.message}\n`;
+          break;
+      }
+    }
+
+    yield `1..${count}\n`;
+    yield `# tests ${count}\n`;
+    yield `# pass ${pass}\n`;
+    yield `# fail ${fail}\n`;
+  }
+
+  Usage in build_spec:
+  elseif position.type == "dir" then
+    local reporter_path = vim.fn.fnamemodify(
+      debug.getinfo(1).source:sub(2), ':h:h:h'
+    ) .. '/reporters/neotest-tap-with-location.js'
+
+    vim.list_extend(command, {
+      "--test-reporter", reporter_path,
+    })
+  end
+
+  Option 2: Wrap the Built-in TAP Reporter
+
+  If you want to reuse the built-in tap reporter:
+
+  // wrapped-tap.js
+  import { tap } from 'node:test/reporters';
+
+  export default async function* wrappedTap(source) {
+    // Clone the source stream because tap will consume it
+    const events = [];
+
+    // Collect events and inject location comments
+    async function* augmentedSource() {
+      for await (const event of source) {
+        // Inject location before test events
+        if (event.type === 'test:pass' || event.type === 'test:fail') {
+          yield {
+            type: 'test:diagnostic',
+            data: {
+              message: `location: ${event.data.file}:${event.data.line}:${event.data.column}`
+            }
+          };
+        }
+        yield event;
+      }
+    }
+
+    // Forward to tap reporter
+    for await (const line of tap(augmentedSource())) {
+      yield line;
+    }
+  }
+
+  Problem with Option 2: You can't easily clone/tee the source stream in JavaScript, so Option 1 is cleaner.
