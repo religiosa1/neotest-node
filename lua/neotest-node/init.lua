@@ -1,8 +1,8 @@
 -- see https://github.com/nvim-neotest/neotest/blob/master/lua/neotest/adapters/interface.lua
 local lib = require("neotest.lib")
-local async = require("neotest.async")
 local TapParser = require("neotest-node.node-tap-parser")
 
+---@type neotest.Adapter
 local NodeNeotestAdapter = { name = "neotest-node" }
 
 local all_tests_shell_pattern = "*.{test,spec}.{js,ts}"
@@ -14,7 +14,7 @@ local test_filename_re = ".*%.test%.[tj]s$"
 ---@param dir string @Directory to treat as cwd
 ---@return string | nil @Absolute root dir of test suite
 function NodeNeotestAdapter.root(dir)
-	return lib.files.match_root_pattern("package.json")(dir) or dir
+	return lib.files.match_root_pattern("package.json")(dir)
 end
 
 ---Filter directories when searching for test files
@@ -126,16 +126,13 @@ function NodeNeotestAdapter.build_spec(args)
 		return
 	end
 	local position = args.tree:data()
-	local cwd = assert(NodeNeotestAdapter.root(position.path), "could not locate root directory of " .. position.path)
+	local cwd = NodeNeotestAdapter.root(position.path)
 
-	local results_path = async.fn.tempname()
 	local command = {
 		"node",
 		"--test",
 		"--test-reporter",
 		"tap",
-		"--test-reporter-destination",
-		results_path,
 	}
 	if position.type == "test" or position.type == "namespace" then
 		vim.list_extend(command, {
@@ -153,11 +150,10 @@ function NodeNeotestAdapter.build_spec(args)
 		table.insert(command, position.path .. "/" .. all_tests_shell_pattern)
 	end
 
-	local parser = TapParser.new(position.path, results_path)
+	local parser = TapParser.new(position.path)
 	return {
 		command = command,
 		context = {
-			results_path = results_path,
 			parser = parser,
 		},
 		cwd = cwd,

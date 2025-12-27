@@ -63,7 +63,6 @@ end
 ---Parser for node-flavored TAP reporter.
 ---@class TapParser
 ---@field file_path string Path of the test-file executed (prepended to position_id)
----@field output string Path to file, containing test output
 ---@field private parser_state ParserState
 ---@field private suite_stack string[]
 ---@field private results table<string, neotest.Result>
@@ -75,12 +74,10 @@ TapParser.__index = TapParser
 
 ---Create a new TapParser instance
 ---@param file_path string Path to test file being parsed
----@param output string Path to file, containing test run output
 ---@return TapParser
-function TapParser.new(file_path, output)
+function TapParser.new(file_path)
 	local self = setmetatable({}, TapParser)
 	self.file_path = file_path
-	self.output = output
 	self.parser_state = parser_state.General
 	self.suite_stack = {}
 	self.results = {}
@@ -102,6 +99,7 @@ end
 ---Parse a single line of TAP output
 ---@param line string Line of TAP input
 function TapParser:parse_line(line)
+	logger.info("Parsing line: ", line)
 	self.tap_line_number = self.tap_line_number + 1
 	-- General State operations
 	-- Header info
@@ -126,7 +124,6 @@ function TapParser:parse_line(line)
 			self.current_test_name = test_name
 			self.results[self:make_position_id(test_name)] = {
 				status = get_result_status(line, comment),
-				output = self.output,
 			}
 		end
 		return
