@@ -5,8 +5,10 @@ Neovim [Neotest](https://github.com/nvim-neotest/neotest) adapter for [node test
 ## Features
 
 - run node test runner tests and suites from your nvim;
-- treesitter detection of `describe`/`it`/`test` actually imported from
-  `node:test`/`test`, so the plugin plays along nicely with your existing
+- test results streaming - your results will appear in the UI one by one as
+  they're processed by the node;
+- detection of imports coming from
+  `node:test`, so the plugin plays along nicely with your existing
   vitest/jest/bun adapter setup and doesn't trigger on foreign tests;
 - DAP debugger connection;
 - Typescript and JS test suites;
@@ -38,7 +40,12 @@ return {
     dependencies = {
       "religios1/neotest-node"
     },
-    opts = { adapters = { "neotest-node" } },
+    opts = {
+      -- notice if you also mixed vitest/jest/bun in your project, this
+      -- adapter must come first, otherwise the first adapter to get the file
+      -- wins
+      adapters = { "neotest-node" }
+    },
   },
 }
 ```
