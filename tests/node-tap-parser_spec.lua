@@ -102,25 +102,40 @@ ok 3 - mock passed test
 ]]
 
 describe("TapParser", function()
-	local TapParser = require("lua/neotest-node/node-tap-parser")
+	local TapParser = require("neotest-node.node-tap-parser")
 
 	it("creates a new instance with empty results (smoketest)", function()
-		local parser = TapParser.new("foo", "bar")
+		local parser = TapParser.new("foo")
 		local results = parser:get_results()
 		assert(vim.tbl_isempty(results))
 	end)
 
 	it("parses flat tests structure", function()
-		local parser = TapParser.new("foo", "bar")
+		local parser = TapParser.new("foo")
 		for line in vim.gsplit(test_flat_tap, "\n") do
 			parser:parse_line(line)
 		end
 		local results = parser:get_results()
 		assert.equal(3, vim.tbl_count(results))
 		assert.are.same({
-			["foo::mock failed test"] = { status = "failed", output = "bar" },
-			["foo::mock skipped test"] = { status = "skipped", output = "bar" },
-			["foo::mock passed test"] = { status = "passed", output = "bar" },
+			["foo::mock failed test"] = { status = "failed" },
+			["foo::mock skipped test"] = { status = "skipped" },
+			["foo::mock passed test"] = { status = "passed" },
+		}, results)
+	end)
+
+	it("parses suited tests structure", function()
+		local parser = TapParser.new("foo")
+		for line in vim.gsplit(test_tap, "\n") do
+			parser:parse_line(line)
+		end
+		local results = parser:get_results()
+		assert.equal(4, vim.tbl_count(results))
+		assert.are.same({
+			["foo::mock suite::mock failed test"] = { status = "failed" },
+			["foo::mock suite::mock skipped test"] = { status = "skipped" },
+			["foo::mock suite::mock passed test"] = { status = "passed" },
+			["foo::mock suite"] = { status = "failed" },
 		}, results)
 	end)
 end)
