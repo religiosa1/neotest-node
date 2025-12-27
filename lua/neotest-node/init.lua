@@ -42,7 +42,7 @@ end
 ---@param file_path string
 ---@return boolean
 function NodeNeotestAdapter.is_test_file(file_path)
-	if string.match(file_path, test_filename_re) == nil then
+	if file_path:match(test_filename_re) == nil then
 		return false
 	end
 	return NodeNeotestAdapter.has_node_test_imports(file_path)

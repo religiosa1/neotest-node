@@ -29,7 +29,7 @@ local split_comment = function(line)
 		return line:sub(1, pos), line:sub(pos + 2)
 	end
 
-	local escaping = string.match(line, "(\\+)#")
+	local escaping = line:match("(\\+)#")
 	if escaping and #escaping % 2 == 0 then
 		pos = line:find("\\+#")
 		return line:sub(1, pos - 1), line:sub(pos + #escaping + 1)
@@ -42,7 +42,7 @@ end
 ---@param comment string? comment part (as retrieved by split_comment)
 ---@return neotest.ResultStatus
 local get_result_status = function(line, comment)
-	if not string.match(line, "^%s*ok ") then
+	if not line:match("^%s*ok ") then
 		return "failed"
 	end
 	if comment == " SKIP" or comment == " TODO" then
@@ -57,7 +57,7 @@ end
 ---@param test_line string
 ---@return string? test name if successfully parsed, nil otherwise
 local get_test_name = function(test_line)
-	return string.match(test_line, "^%s*ok %d+ %- (.+)$") or string.match(test_line, "^%s*not ok %d+ %- (.+)$")
+	return test_line:match("^%s*ok %d+ %- (.+)$") or test_line:match("^%s*not ok %d+ %- (.+)$")
 end
 
 ---Parser for node-flavored TAP reporter.
@@ -69,6 +69,7 @@ end
 ---@field private current_error_lines string[]
 ---@field private current_test_name string?
 ---@field private tap_line_number number
+---@field private indentation_level number
 local TapParser = {}
 TapParser.__index = TapParser
 
@@ -83,37 +84,78 @@ function TapParser.new(file_path)
 	self.results = {}
 	self.current_test_name = nil
 	self.tap_line_number = 0
+	self.indentation_level = 0
 	return self
 end
 
----@private
----@param test_name string
----@return string position_id as concatenation of file_path, suite stack and name
-function TapParser:make_position_id(test_name)
-	local position_id = self.file_path or ""
-	-- TODO: iterate over suite stack and join namespaces here
-	position_id = position_id .. "::" .. test_name
-	return position_id
+---Get indentation level from the TAP string in General state
+---@param line string TAP string
+---@return number of leading whitespace chars, aka indentation level
+local get_indentation_level = function(line)
+	local indentation = line:match("^%s+")
+	return indentation and #indentation or 0
 end
 
 ---Parse a single line of TAP output
 ---@param line string Line of TAP input
 function TapParser:parse_line(line)
-	logger.info("Parsing line: ", line)
 	self.tap_line_number = self.tap_line_number + 1
-	-- General State operations
+	if self.parser_state == parser_state.YamlDiagnostic then
+		if line:match("^%s*...$") then
+			self.parser_state = parser_state.General
+			return
+		else
+			-- TODO: stateful diagnostics parser; capture error message and line number
+		end
+	elseif self.parser_state == parser_state.TestResult then
+		if self.parser_state == parser_state.TestResult and line:match("^%s*---$") then
+			self.parser_state = parser_state.YamlDiagnostic
+			return
+		else
+			self.parser_state = parser_state.General
+			self:parse_general_line(line)
+		end
+	else
+		self:parse_general_line(line)
+	end
+end
+
+---Get all results parsed so far (cumulative)
+---@return table<string, neotest.Result>
+function TapParser:get_results()
+	return self.results
+end
+
+---@private
+---@param line string
+function TapParser:parse_general_line(line)
 	-- Header info
-	if string.match(line, "TAP version 1[34]") then
+	if line:match("TAP version 1[34]") then
 		return
 	end
-	-- Execution plan
-	if string.match(line, "^%s*%d+%.%.%d+") then
+
+	local indentation_level = get_indentation_level(line)
+	local indentation_diff = self.indentation_level - indentation_level
+	self.indentation_level = indentation_level
+
+	-- Execution plan; in node TAP, it comes immediately after a suite,
+	-- so we're popping a suite from the stack
+	if line:match("^%s*%d+%.%.%d+") then
+		table.remove(self.suite_stack)
 		return
 	end
-	-- Test Result
-	if string.match(line, "^%s*ok %d") or string.match(line, "^%s*not ok %d") then
+	-- Subtest marker: can be a test or a suite, we don't know for now
+	local subtest_marker = line:match("^%s*# Subtest: (.+)")
+	if subtest_marker then
+		table.insert(self.suite_stack, subtest_marker)
+	end
+	-- Test Line, aka result
+	if line:match("^%s*ok %d") or line:match("^%s*not ok %d") then
 		self.parser_state = parser_state.TestResult
-		-- TODO: capture indentation level change for capturing stack trace
+		-- the same indentation as subtest marker previously, so it's a test, not a suite
+		if indentation_diff == 0 then
+			table.remove(self.suite_stack)
+		end
 		local payload, comment = split_comment(line)
 		local test_name = get_test_name(payload)
 		if not test_name then
@@ -128,22 +170,18 @@ function TapParser:parse_line(line)
 		end
 		return
 	end
-	if self.parser_state == parser_state.TestResult and string.match(line, "^%s*---$") then
-		self.parser_state = parser_state.YamlDiagnostic
-	end
-	if self.parser_state == parser_state.YamlDiagnostic then
-		if string.match(line, "^%s*...$") then
-			self.parser_state = parser_state.General
-		else
-			-- TODO: stateful diagnostics parser; capture error message and line number
-		end
-	end
 end
 
----Get all results parsed so far (cumulative)
----@return table<string, neotest.Result>
-function TapParser:get_results()
-	return self.results
+---@private
+---@param test_name string
+---@return string position_id as concatenation of file_path, suite stack and name
+function TapParser:make_position_id(test_name)
+	local position_id = self.file_path or ""
+	for _, suite in ipairs(self.suite_stack) do
+		position_id = position_id .. "::" .. suite
+	end
+	position_id = position_id .. "::" .. test_name
+	return position_id
 end
 
 return TapParser
