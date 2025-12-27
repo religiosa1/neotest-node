@@ -2,7 +2,6 @@
 local lib = require("neotest.lib")
 local TapParser = require("neotest-node.node-tap-parser")
 
----@type neotest.Adapter
 local NodeNeotestAdapter = { name = "neotest-node" }
 
 local all_tests_shell_pattern = "*.{test,spec}.{js,ts}"
@@ -28,6 +27,17 @@ function NodeNeotestAdapter.filter_dir(name, rel_path, root)
 	return name ~= "node_modules"
 end
 
+function NodeNeotestAdapter.has_node_test_imports(file_path)
+	local file = io.open(file_path, "r")
+	if not file then
+		return false
+	end
+	local content = file:read(2000)
+	file:close()
+	return content
+		and (content:match("from%s+[\"']node:test[\"']") or content:match("require%s*%(%s*[\"']node:test[\"']%s*%)"))
+end
+
 ---@async
 ---@param file_path string
 ---@return boolean
@@ -35,8 +45,7 @@ function NodeNeotestAdapter.is_test_file(file_path)
 	if string.match(file_path, test_filename_re) == nil then
 		return false
 	end
-	-- TODO: filter out files not having describe/it/test imports from node:test
-	return true
+	return NodeNeotestAdapter.has_node_test_imports(file_path)
 end
 
 ---Given a file path, parse all the tests within it.
