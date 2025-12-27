@@ -111,12 +111,16 @@ describe("TapParser", function()
 	end)
 
 	it("parses flat tests structure", function()
-		local parser = TapParser("foo", "bar")
+		local parser = TapParser.new("foo", "bar")
 		for line in vim.gsplit(test_flat_tap, "\n") do
 			parser:parse_line(line)
 		end
 		local results = parser:get_results()
-		assert.equal(#results, 3)
-		-- TODO: results comparison
+		assert.equal(3, vim.tbl_count(results))
+		assert.are.same({
+			["foo::mock failed test"] = { status = "failed", output = "bar" },
+			["foo::mock skipped test"] = { status = "skipped", output = "bar" },
+			["foo::mock passed test"] = { status = "passed", output = "bar" },
+		}, results)
 	end)
 end)
