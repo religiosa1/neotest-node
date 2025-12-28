@@ -61,6 +61,7 @@ local get_test_name = function(test_line)
 end
 
 ---Parser for node-flavored TAP reporter.
+---see TAP website https://testanything.org/
 ---@class TapParser
 ---@field file_path string Path of the test-file executed (prepended to position_id)
 ---@field private parser_state ParserState
@@ -144,7 +145,8 @@ function TapParser:parse_general_line(line)
 		table.remove(self.suite_stack)
 		return
 	end
-	-- Subtest marker: can be a test or a suite, we don't know for now
+	-- Subtest marker: can be a test or a suite, we don't know for now;
+	-- if it's a test we'll pop it back in test line parsing
 	local subtest_marker = line:match("^%s*# Subtest: (.+)")
 	if subtest_marker then
 		table.insert(self.suite_stack, subtest_marker)
