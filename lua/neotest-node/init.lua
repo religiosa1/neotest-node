@@ -53,12 +53,13 @@ end
 ---@param file_path string Absolute file path
 ---@return neotest.Tree | nil
 function NodeNeotestAdapter.discover_positions(file_path)
-	-- for some reason [] syntax doesn't work for describe arguments, so we just
-	-- entering describe blocks twice once for arrow_function and once for function_expression
-	-- TODO: figure out why
+	-- The [] alternation syntax works in treesitter, but not in neotest's
+	-- parse_positions, as it moves namespace after test, and this can't be
+	-- handled by neotest. We're keeping namespace queries duplicated, so they
+	-- come before test results.
 	local query = [[
 ; -- Namespaces --
-; Matches: `describe('context', () =>{}) 
+; Matches: `describe('context', () =>{})
 ((call_expression
   function: (identifier) @func_name (#eq? @func_name "describe")
   arguments: (arguments
