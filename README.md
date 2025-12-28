@@ -2,6 +2,9 @@
 
 Neovim [Neotest](https://github.com/nvim-neotest/neotest) adapter for [node test runner](https://nodejs.org/api/test.html)
 
+Requires node 18+, for typescript support you need node v22.18.0+ (22.6.0 if you
+add `--experimental-strip-types` to args)
+
 ## Features
 
 - run node test runner tests and suites from your nvim;
@@ -49,3 +52,29 @@ return {
   },
 }
 ```
+
+## Implementation details
+
+### Node test detection
+
+As I can imagine you also have vitest/jest/bun or whatever else in your
+adapters, we must differentiate between node tests vs any other solution.
+[jest](https://github.com/nvim-neotest/neotest-jest) and [vitest](https://github.com/marilari88/neotest-vitest) adapters check presence of their corresponding
+testrunner in dependencies, while bun can check for bun lockfile.
+
+We don't have this option, as node test runner won't be present in deps -- it
+comes out of the box.
+
+This detection must happen in `is_test_file` adapter function -- neotest passes
+test execution to the first adapter matched by its is_test_file function.
+
+So instead of inspecting package.json (which isn't required for this adapter),
+if the file has the correct extension (e.g. `foo.test.ts` or `bar.spec.js`)
+we're reading the first 2000 chars from the file and trying to find an import
+from `node:test` with a regex (be that CJS or ESM import).
+
+We're using regex instead of treesitter, to avoid extra overhead of parsing
+every test files just to determine if we should anything with a file.
+
+If you want to disable this functionality you can pass your custom `is_test_file`
+in the adapter options in your config.
