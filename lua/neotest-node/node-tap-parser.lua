@@ -14,7 +14,7 @@ local parser_state = {
 ---Leading whitespaces are preserved in both return values.
 ---@return string the contents part
 ---@return string? comment part of a string
-local split_comment = function(line)
+local function split_comment(line)
 	local pos = line:find(" #")
 	if pos then
 		return line:sub(1, pos - 1), line:sub(pos + 2)
@@ -41,7 +41,7 @@ end
 ---@param line string TAP test line without comment ("ok" or "not ok")
 ---@param comment string? comment part (as retrieved by split_comment)
 ---@return neotest.ResultStatus
-local get_result_status = function(line, comment)
+local function get_result_status(line, comment)
 	if not line:match("^%s*ok ") then
 		return "failed"
 	end
@@ -56,7 +56,7 @@ end
 ---strip_comment call first.
 ---@param test_line string
 ---@return string? test name if successfully parsed, nil otherwise
-local get_test_name = function(test_line)
+local function get_test_name(test_line)
 	return test_line:match("^%s*ok %d+ %- (.+)$") or test_line:match("^%s*not ok %d+ %- (.+)$")
 end
 

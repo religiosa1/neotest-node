@@ -2,17 +2,67 @@
 local lib = require("neotest.lib")
 local TapParser = require("neotest-node.node-tap-parser")
 
-local NodeNeotestAdapter = { name = "neotest-node" }
+local adapter = { name = "neotest-node" }
+
+---@class neotest.AdapterOptions
+---@field env? table<string, string> | fun(): table<string, string>
+---@field cwd? string | fun(position_path: string): string?
+---@field filter_dir? fun(name: string, rel_path: string, root: string): boolean
+---@field is_test_file? fun(file_path: string): boolean
 
 local all_tests_shell_pattern = "*.{test,spec}.{js,ts}"
-local test_filename_re = ".*%.test%.[tj]s$"
+
+local function is_callable(obj)
+	return type(obj) == "function" or (type(obj) == "table" and obj.__call)
+end
+
+---@return table<string, string>
+local getEnv = function()
+	return {}
+end
+
+---@type fun(position_path: string): string?
+local getCwd = function(position_path)
+	return adapter.root(position_path)
+end
+
+setmetatable(adapter, {
+	---@param opts neotest.AdapterOptions
+	__call = function(_, opts)
+		if is_callable(opts.env) then
+			getEnv = opts.env --[[@as fun():table<string>]]
+		elseif opts.env then
+			getEnv = function()
+				return opts.env
+			end
+		end
+
+		if is_callable(opts.cwd) then
+			getCwd = opts.cwd --[[@as fun():table<string>]]
+		elseif opts.cwd then
+			getCwd = function()
+				return opts.cwd
+			end
+		end
+
+		if is_callable(opts.filter_dir) then
+			adapter.filter_dir = opts.filter_dir
+		end
+
+		if is_callable(opts.is_test_file) then
+			adapter.is_test_file = opts.is_test_file
+		end
+
+		return adapter
+	end,
+})
 
 ---Find the project root directory given a current directory to work from.
 ---Should no root be found, the adapter can still be used in a non-project context if a test file matches.
 ---@async
 ---@param dir string @Directory to treat as cwd
 ---@return string | nil @Absolute root dir of test suite
-function NodeNeotestAdapter.root(dir)
+function adapter.root(dir)
 	return lib.files.match_root_pattern("package.json")(dir)
 end
 
@@ -23,11 +73,11 @@ end
 ---@param root string Root directory of project
 ---@return boolean
 ---@diagnostic disable-next-line: unused-local
-function NodeNeotestAdapter.filter_dir(name, rel_path, root)
+function adapter.filter_dir(name, rel_path, root)
 	return name ~= "node_modules"
 end
 
-function NodeNeotestAdapter.has_node_test_imports(file_path)
+function adapter.has_node_test_imports(file_path)
 	local file = io.open(file_path, "r")
 	if not file then
 		return false
@@ -41,18 +91,18 @@ end
 ---@async
 ---@param file_path string
 ---@return boolean
-function NodeNeotestAdapter.is_test_file(file_path)
-	if file_path:match(test_filename_re) == nil then
+function adapter.is_test_file(file_path)
+	if file_path:match(".*%.test%.[tj]s$") == nil then
 		return false
 	end
-	return NodeNeotestAdapter.has_node_test_imports(file_path)
+	return adapter.has_node_test_imports(file_path)
 end
 
 ---Given a file path, parse all the tests within it.
 ---@async
 ---@param file_path string Absolute file path
 ---@return neotest.Tree | nil
-function NodeNeotestAdapter.discover_positions(file_path)
+function adapter.discover_positions(file_path)
 	-- The [] alternation syntax works in treesitter, but not in neotest's
 	-- parse_positions, as it moves namespace after test, and this can't be
 	-- handled by neotest. We're keeping namespace queries duplicated, so they
@@ -131,12 +181,11 @@ end
 
 ---@param args neotest.RunArgs
 ---@return nil | neotest.RunSpec | neotest.RunSpec[]
-function NodeNeotestAdapter.build_spec(args)
+function adapter.build_spec(args)
 	if not args.tree then
 		return
 	end
 	local position = args.tree:data()
-	local cwd = NodeNeotestAdapter.root(position.path)
 
 	local command = {
 		"node",
@@ -166,7 +215,8 @@ function NodeNeotestAdapter.build_spec(args)
 		context = {
 			parser = parser,
 		},
-		cwd = cwd,
+		env = getEnv(),
+		cwd = getCwd(position.path),
 		stream = function(output_stream)
 			return function()
 				local new_lines = output_stream()
@@ -184,7 +234,7 @@ end
 ---@param result neotest.StrategyResult
 ---@param tree neotest.Tree
 ---@return table<string, neotest.Result>
-function NodeNeotestAdapter.results(spec, result, tree)
+function adapter.results(spec, result, tree)
 	local parser = spec.context.parser
 	assert(parser, "Unable to extract reporter parser for test results retrieval from test context")
 	return parser:get_results()
@@ -215,4 +265,4 @@ function NodeNeotestAdapter.results(spec, result, tree)
 	-- 	{ status = "passed", short = "zxcv" }
 end
 
-return NodeNeotestAdapter
+return adapter
