@@ -1,5 +1,6 @@
 -- see https://github.com/nvim-neotest/neotest/blob/master/lua/neotest/adapters/interface.lua
 local lib = require("neotest.lib")
+local logger = require("neotest.logging")
 local TapParser = require("neotest-node.node-tap-parser")
 
 local adapter = { name = "neotest-node" }
@@ -98,6 +99,55 @@ function adapter.is_test_file(file_path)
 	return adapter.has_node_test_imports(file_path)
 end
 
+--- Tap always applies escaping to control characters to test names, so we're
+--- doing the same thing. TAP itself also escapes \# and '\' itself, we don't
+--- do it here, instead we're stripping that in tap parser.
+---See: https://github.com/nodejs/node/blob/main/lib/internal/test_runner/reporter/tap.js
+---@param str string
+---@return string
+local function test_name_escape(str)
+	local result = str
+	result = result:gsub("\b", "\\b")
+	result = result:gsub("\f", "\\f")
+	result = result:gsub("\t", "\\t")
+	result = result:gsub("\n", "\\n")
+	result = result:gsub("\r", "\\r")
+	result = result:gsub("\v", "\\v")
+	return result
+end
+
+---Decode a JavaScript string literal by removing quotes and unescaping
+---@param js_string string The string as captured from source (with quotes)
+---@return string The decoded string value
+local function parse_test_name_literal(js_string)
+	local ok, decoded = pcall(vim.fn.json_decode, js_string)
+	if not ok then
+		logger.warn("Unable to decode test name ", js_string)
+		return js_string
+	end
+	return decoded
+end
+
+---Convert escaped test name to a re pattern that will be passed to node test
+---runner to pinpoint test name
+---@param test_pattern string
+---@return string
+local function convert_test_name_to_node_re(test_pattern)
+	-- Escape special regex characters for Node.js regular expressions
+	local escaped = vim.fn.escape(test_pattern, "^$*.()+?{}[]|\\-")
+
+	-- Node TAP reporter always substitutes line breaks for '\n'. We're storing
+	-- position_id exactly as node reports it, so for us here there's no way to
+	-- tell literal line break and "\n" apart -- so we're matching for both.
+	local re = escaped:gsub("\\\\b", "(\\b|\\\\b)")
+	re = re:gsub("\\\\f", "(\\f|\\\\f)")
+	re = re:gsub("\\\\t", "(\\t|\\\\t)")
+	re = re:gsub("\\\\n", "(\\n|\\\\n)")
+	re = re:gsub("\\\\r", "(\\r|\\\\r)")
+	re = re:gsub("\\\\v", "(\\v|\\\\v)")
+	return "^" .. re .. "$"
+end
+
 ---Given a file path, parse all the tests within it.
 ---@async
 ---@param file_path string Absolute file path
@@ -107,20 +157,24 @@ function adapter.discover_positions(file_path)
 	-- parse_positions, as it moves namespace after test, and this can't be
 	-- handled by neotest. We're keeping namespace queries duplicated, so they
 	-- come before test results.
+	--
+	-- We're using (string) with a post-processing with decode_js_string for names
+	-- instead of string fragment directly, because of potential presence of
+	-- escape literals, which will break string into multiple fragments
 	local query = [[
 ; -- Namespaces --
 ; Matches: `describe('context', () =>{})
 ((call_expression
   function: (identifier) @func_name (#eq? @func_name "describe")
   arguments: (arguments
-    (string (string_fragment) @namespace.name)
+    (string) @namespace.name
     (arrow_function)
   )
 )) @namespace.definition
 ((call_expression
   function: (identifier) @func_name (#eq? @func_name "describe")
   arguments: (arguments
-    (string (string_fragment) @namespace.name)
+    (string) @namespace.name
     (function_expression)
   )
 )) @namespace.definition
@@ -131,7 +185,7 @@ function adapter.discover_positions(file_path)
     object: (identifier) @func_name (#any-of? @func_name "describe")
   )
   arguments: (arguments
-    (string (string_fragment) @namespace.name)
+    (string) @namespace.name
     (arrow_function)
   )
 )) @namespace.definition
@@ -141,7 +195,7 @@ function adapter.discover_positions(file_path)
     object: (identifier) @func_name (#any-of? @func_name "describe")
   )
   arguments: (arguments
-    (string (string_fragment) @namespace.name)
+    (string) @namespace.name
     (function_expression)
   )
 )) @namespace.definition
@@ -154,7 +208,7 @@ function adapter.discover_positions(file_path)
 ((call_expression
   function: (identifier) @func_name (#any-of? @func_name "it" "test")
   arguments: (arguments
-    (string (string_fragment) @test.name)
+    (string) @test.name
     [(arrow_function) (function_expression)]
   )
 )) @test.definition
@@ -165,16 +219,34 @@ function adapter.discover_positions(file_path)
     object: (identifier) @func_name (#any-of? @func_name "test" "it")
   )
   arguments: (arguments
-    (string (string_fragment) @test.name)
+    (string) @test.name
     [(arrow_function) (function_expression)]
   )
 )) @test.definition
   ]]
-	-- complaints about position_id constructor, but default is actually provided for it
-	---@diagnostic disable-next-line: missing-fields
 	local positions = lib.treesitter.parse_positions(file_path, query, {
 		nested_tests = true,
 		require_namespaces = false,
+		-- Building position_id, decoding JavaScript string literals (remove quotes and unescape)
+		position_id = function(position, parents)
+			if position.name then
+				position.name = parse_test_name_literal(position.name)
+			end
+
+			local parts = { position.path }
+			for _, parent in ipairs(parents) do
+				if parent.type ~= "file" then
+					table.insert(parts, parent.name)
+				end
+			end
+			if position.type ~= "file" then
+				-- for namespaces and tests we're additional replacing potential control
+				-- characters, such as \n, \t, etc.
+				position.name = test_name_escape(position.name)
+				table.insert(parts, position.name)
+			end
+			return table.concat(parts, "::")
+		end,
 	})
 	return positions
 end
@@ -194,9 +266,10 @@ function adapter.build_spec(args)
 		"tap",
 	}
 	if position.type == "test" or position.type == "namespace" then
+		local name_pattern = convert_test_name_to_node_re(position.name)
 		vim.list_extend(command, {
 			"--test-name-pattern",
-			position.name,
+			name_pattern,
 			-- must come after --test-name-pattern argument
 			position.path,
 		})
@@ -239,7 +312,6 @@ function adapter.results(spec, result, tree)
 	assert(parser, "Unable to extract reporter parser for test results retrieval from test context")
 	return parser:get_results()
 
-	-- vim.print(g_positions)
 	-- results["/home/religiosa/projects/blueprint-mozio/packages/blueprint-mozio-backend/src/emailTemplates/html.test.ts::html"] =
 	-- 	{
 	-- 		status = "failed",
