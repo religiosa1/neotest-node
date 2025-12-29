@@ -38,10 +38,10 @@ setmetatable(adapter, {
 		end
 
 		if is_callable(opts.cwd) then
-			getCwd = opts.cwd --[[@as fun():table<string>]]
+			getCwd = opts.cwd --[[@as fun(string):string]]
 		elseif opts.cwd then
 			getCwd = function()
-				return opts.cwd
+				return opts.cwd --[[@as string]]
 			end
 		end
 

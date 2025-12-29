@@ -70,4 +70,24 @@ describe("TapParser", function()
 			["foo::mock passed test"] = { status = "passed" },
 		}, results)
 	end)
+
+	it("parses tests that contain weird names", function()
+		local test_nested_tap = generate_tap("namingEdgeCases.test.js")
+		local parser = TapParser.new("foo")
+		for line in vim.gsplit(test_nested_tap, "\n") do
+			parser:parse_line(line)
+		end
+		local results = parser:get_results()
+		assert.are.same({
+			["foo::contains # inside of the name"] = { status = "passed" },
+			["foo::ends with whitespace "] = { status = "passed" },
+			["foo::contains \\ inside of the name"] = { status = "passed" },
+			-- We're doing it twice -- because skipped tests contain a comment
+			-- so in this way we can test both split lines with a comment, and just
+			-- the unescaping part
+			["foo::skipped: contains # inside of the name"] = { status = "skipped" },
+			["foo::skipped: ends with whitespace "] = { status = "skipped" },
+			["foo::skipped: contains \\ inside of the name"] = { status = "skipped" },
+		}, results)
+	end)
 end)

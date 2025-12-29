@@ -7,6 +7,20 @@ local parser_state = {
 	YamlDiagnostic = 2,
 }
 
+---Remove TAP escaping from a line
+---@param line string input line
+---@return string line with escaping expanded
+local function unescape(line)
+	local cleaned = line:gsub("\\(.)", function(c)
+		if c == "\\" or c == "#" then
+			return c
+		else
+			return "\\" .. c -- Not a recognized escape, keep as-is
+		end
+	end)
+	return cleaned
+end
+
 ---Split a line into the contents part and optional comment part, considering
 ---potential comment escaping syntax "\#"
 ---Comment char '#' won't be included into either of return parts. Single
@@ -15,27 +29,31 @@ local parser_state = {
 ---@return string the contents part
 ---@return string? comment part of a string
 local function split_comment(line)
-	local pos = line:find(" #")
-	if pos then
-		return line:sub(1, pos - 1), line:sub(pos + 2)
+	---@type number | nil
+	local found_position = nil
+	local has_preceding_whitespace = false
+	local has_preceding_backslash = false
+	for i = 1, #line do
+		local v = string.sub(line, i, i)
+		local ws = (not has_preceding_backslash) and v == " "
+		local bs = v == "\\"
+
+		if v == "#" and not has_preceding_backslash then
+			found_position = i
+			break
+		end
+		has_preceding_whitespace = ws
+		has_preceding_backslash = bs and not has_preceding_backslash
 	end
 
-	if line:find("^#") then
-		return "", line:sub(2)
+	if found_position ~= nil then
+		if has_preceding_whitespace then
+			return unescape(line:sub(1, found_position - 2)), line:sub(found_position + 1)
+		else
+			return unescape(line:sub(1, found_position - 1)), line:sub(found_position + 1)
+		end
 	end
-
-	pos = line:find("[^\\]#")
-	if pos then
-		return line:sub(1, pos), line:sub(pos + 2)
-	end
-
-	local escaping = line:match("(\\+)#")
-	if escaping and #escaping % 2 == 0 then
-		pos = line:find("\\+#")
-		return line:sub(1, pos - 1), line:sub(pos + #escaping + 1)
-	end
-
-	return line, nil
+	return unescape(line), nil
 end
 
 ---@param line string TAP test line without comment ("ok" or "not ok")
