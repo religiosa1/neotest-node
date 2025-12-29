@@ -251,6 +251,26 @@ function adapter.discover_positions(file_path)
 	return positions
 end
 
+---@param strategy string
+---@param command string[]
+---@param cwd string?
+---@return table?
+local function get_strategy(strategy, command, cwd)
+	if strategy == "dap" then
+		return {
+			name = "Debug Node Tests",
+			type = "pwa-node",
+			request = "launch",
+			runtimeExecutable = "node",
+			args = vim.list_slice(command, 2),
+			console = "integratedTerminal",
+			internalConsoleOptions = "neverOpen",
+			rootPath = "${workspaceFolder}",
+			cwd = cwd or "${workspaceFolder}",
+		}
+	end
+end
+
 ---@param args neotest.RunArgs
 ---@return nil | neotest.RunSpec | neotest.RunSpec[]
 function adapter.build_spec(args)
@@ -282,14 +302,16 @@ function adapter.build_spec(args)
 		table.insert(command, position.path .. "/" .. all_tests_shell_pattern)
 	end
 
+	local cwd = getCwd(position.path)
 	local parser = TapParser.new(position.path)
 	return {
 		command = command,
 		context = {
 			parser = parser,
 		},
+		strategy = get_strategy(args.strategy, command, cwd),
 		env = getEnv(),
-		cwd = getCwd(position.path),
+		cwd = cwd,
 		stream = function(output_stream)
 			return function()
 				local new_lines = output_stream()
@@ -312,17 +334,10 @@ function adapter.results(spec, result, tree)
 	assert(parser, "Unable to extract reporter parser for test results retrieval from test context")
 	return parser:get_results()
 
-	-- results["/home/religiosa/projects/blueprint-mozio/packages/blueprint-mozio-backend/src/emailTemplates/html.test.ts::html"] =
-	-- 	{
-	-- 		status = "failed",
-	-- 		short = "html: passed",
-	-- 		output = "/home/religiosa/projects/blueprint-mozio/packages/blueprint-mozio-backend/blah1",
-	-- 	}
 	-- results["/home/religiosa/projects/blueprint-mozio/packages/blueprint-mozio-backend/src/emailTemplates/html.test.ts::html::renders provided html as a string"] =
 	-- 	{
 	-- 		status = "failed",
 	-- 		short = "failed",
-	-- 		output = "/home/religiosa/projects/blueprint-mozio/packages/blueprint-mozio-backend/blah2",
 	-- 		errors = {
 	-- 			{
 	-- 				message = "qwert dsf asd msg",
@@ -331,10 +346,6 @@ function adapter.results(spec, result, tree)
 	-- 			},
 	-- 		},
 	-- 	}
-	-- results["/home/religiosa/projects/blueprint-mozio/packages/blueprint-mozio-backend/src/emailTemplates/html.test.ts::html::escapes provided values"] =
-	-- 	{ status = "skipped", short = "mnbv" }
-	-- results["/home/religiosa/projects/blueprint-mozio/packages/blueprint-mozio-backend/src/emailTemplates/html.test.ts::html::doesn't escape raw values"] =
-	-- 	{ status = "passed", short = "zxcv" }
 end
 
 return adapter
