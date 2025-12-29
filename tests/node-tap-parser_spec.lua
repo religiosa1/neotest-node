@@ -82,6 +82,10 @@ describe("TapParser", function()
 			["foo::contains # inside of the name"] = { status = "passed" },
 			["foo::ends with whitespace "] = { status = "passed" },
 			["foo::contains \\ inside of the name"] = { status = "passed" },
+			-- note that line break is escaped for internal storage
+			["foo::contains \\n inside of the name"] = { status = "passed" },
+			-- here it is escaped exactly the same, even it wasn't a literal \n
+			["foo::contains fake \\n inside of the name"] = { status = "passed" },
 			-- We're doing it twice -- because skipped tests contain a comment
 			-- so in this way we can test both split lines with a comment, and just
 			-- the unescaping part

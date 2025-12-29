@@ -1,3 +1,7 @@
+-- Node.js TAP reporter implementation reference:
+-- https://github.com/nodejs/node/blob/main/lib/internal/test_runner/reporter/tap.js
+-- The tapEscape() function escapes: # \ \n \t \r \f \b \v
+
 local logger = require("neotest.logging")
 
 ---@enum ParserState
@@ -7,18 +11,18 @@ local parser_state = {
 	YamlDiagnostic = 2,
 }
 
----Remove TAP escaping from a line
+---Remove TAP escaping from a line -- but only the minimal part \\ and \#,
 ---@param line string input line
 ---@return string line with escaping expanded
 local function unescape(line)
-	local cleaned = line:gsub("\\(.)", function(c)
+	local unescaped = line:gsub("\\(.)", function(c)
 		if c == "\\" or c == "#" then
 			return c
 		else
 			return "\\" .. c -- Not a recognized escape, keep as-is
 		end
 	end)
-	return cleaned
+	return unescaped
 end
 
 ---Split a line into the contents part and optional comment part, considering

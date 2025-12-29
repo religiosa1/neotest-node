@@ -16,6 +16,14 @@ it("contains \\ inside of the name", (t) => {
 	t.assert.equal(double(2), 4);
 });
 
+it("contains \n inside of the name", (t) => {
+	t.assert.equal(double(2), 4);
+});
+
+it("contains fake \\n inside of the name", (t) => {
+	t.assert.equal(double(2), 4);
+});
+
 it.skip("skipped: contains # inside of the name", (t) => {
 	t.assert.equal(double(2), 4);
 });
