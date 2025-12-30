@@ -13,10 +13,6 @@ local adapter = { name = "neotest-node" }
 
 local all_tests_shell_pattern = "*.{test,spec}.{js,ts}"
 
-local function is_callable(obj)
-	return type(obj) == "function" or (type(obj) == "table" and obj.__call)
-end
-
 ---@return table<string, string>
 local getEnv = function()
 	return {}
@@ -30,7 +26,7 @@ end
 setmetatable(adapter, {
 	---@param opts neotest.AdapterOptions
 	__call = function(_, opts)
-		if is_callable(opts.env) then
+		if vim.is_callable(opts.env) then
 			getEnv = opts.env --[[@as fun():table<string>]]
 		elseif opts.env then
 			getEnv = function()
@@ -38,7 +34,7 @@ setmetatable(adapter, {
 			end
 		end
 
-		if is_callable(opts.cwd) then
+		if vim.is_callable(opts.cwd) then
 			getCwd = opts.cwd --[[@as fun(string):string]]
 		elseif opts.cwd then
 			getCwd = function()
@@ -46,11 +42,11 @@ setmetatable(adapter, {
 			end
 		end
 
-		if is_callable(opts.filter_dir) then
+		if vim.is_callable(opts.filter_dir) then
 			adapter.filter_dir = opts.filter_dir
 		end
 
-		if is_callable(opts.is_test_file) then
+		if vim.is_callable(opts.is_test_file) then
 			adapter.is_test_file = opts.is_test_file
 		end
 
@@ -333,19 +329,6 @@ function adapter.results(spec, result, tree)
 	local parser = spec.context.parser
 	assert(parser, "Unable to extract reporter parser for test results retrieval from test context")
 	return parser:get_results()
-
-	-- results["/home/religiosa/projects/blueprint-mozio/packages/blueprint-mozio-backend/src/emailTemplates/html.test.ts::html::renders provided html as a string"] =
-	-- 	{
-	-- 		status = "failed",
-	-- 		short = "failed",
-	-- 		errors = {
-	-- 			{
-	-- 				message = "qwert dsf asd msg",
-	-- 				line = 5,
-	-- 				-- severity = vim.diagnostic.severity.ERROR
-	-- 			},
-	-- 		},
-	-- 	}
 end
 
 return adapter
