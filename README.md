@@ -78,3 +78,24 @@ every test files just to determine if we should anything with a file.
 
 If you want to disable this functionality you can pass your custom `is_test_file`
 in the adapter options in your config.
+
+## Local Development
+
+### Running Tests
+
+For running tests you need a neovim setup and node 20+ available in your path.
+
+To run the whole test suite:
+
+```sh
+./scripts/test.sh
+```
+
+You can launch a specific unit-test by:
+
+```sh
+./scripts/test.sh tests/yaml-diagnostics-parser_spec.lua
+```
+
+On the initial launch script will retrieve its deps by cloning the corresponding
+github repos into `.testsdep` folder.
