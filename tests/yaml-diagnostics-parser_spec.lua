@@ -21,7 +21,7 @@ describe("YamlDiagnosticsParser", function()
         startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17)
     ]]
 		-- TODO: literal expansion
-		local WANT_ERROR_MSG = "'Must be an int'"
+		local WANT_ERROR_MSG = "Must be an int"
 		local WANT_ERROR_LINE_NUM = 7
 
 		local parser = YamlDiagnosticsParser.new(TEST_FILE)
@@ -62,7 +62,7 @@ describe("YamlDiagnosticsParser", function()
         async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)
     ]]
 		-- TODO: literal expansion
-		local WANT_ASSERTION_MSG = [["'<p>Hi-- &lt;br /&gt; there!</p>' == '<p>Hi &lt;br /&gt; there!</p>'"]]
+		local WANT_ASSERTION_MSG = [['<p>Hi-- &lt;br /&gt; there!</p>' == '<p>Hi &lt;br /&gt; there!</p>']]
 		local WANT_ASSERT_LINE_NUM = 9
 
 		local parser = YamlDiagnosticsParser.new(TEST_FILE)
@@ -107,7 +107,7 @@ describe("YamlDiagnosticsParser", function()
 		local results = parser:get_errors()
 		assert.are.same({
 			{
-				message = "'1 subtest failed'",
+				message = "1 subtest failed",
 			},
 		}, results)
 	end)
@@ -136,7 +136,7 @@ describe("YamlDiagnosticsParser", function()
 		local results = parser:get_errors()
 		assert.are.same({
 			{
-				message = "'Must be an int'",
+				message = "Must be an int",
 			},
 		}, results)
 	end)

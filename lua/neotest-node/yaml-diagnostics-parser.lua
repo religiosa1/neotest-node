@@ -52,8 +52,7 @@ function YamlDiagnosticsParser:parse_line(line)
 	-- General state parsing
 	local error_msg_literal = stripped:match("^%s*error:%s*(.*)")
 	if error_msg_literal then
-		-- TODO: literal expansion
-		self.error_message = error_msg_literal
+		self.error_message = util.decode_js_string_literal(error_msg_literal)
 		return
 	elseif stripped:match("^stack: [>|][+-]?") then -- YML block scalar
 		self.state = DiagnosticsParserState.StackTrace
@@ -87,11 +86,11 @@ function YamlDiagnosticsParser:extract_error_line_from_stack()
 	end
 
 	local line_number_str = testfile_stacktrace_line:match(":(%d+)")
-local line_number = line_number_str and tonumber(line_number_str)
-  if not line_number then
-    return nil
-  end
-  return line_number - 1 -- node reports next line for some reason
+	local line_number = line_number_str and tonumber(line_number_str)
+	if not line_number then
+		return nil
+	end
+	return line_number - 1 -- node reports next line for some reason
 end
 
 return YamlDiagnosticsParser

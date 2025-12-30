@@ -1,6 +1,6 @@
 -- see https://github.com/nvim-neotest/neotest/blob/master/lua/neotest/adapters/interface.lua
 local lib = require("neotest.lib")
-local logger = require("neotest.logging")
+local util = require("neotest-node.util")
 local TapParser = require("neotest-node.node-tap-parser")
 
 local adapter = { name = "neotest-node" }
@@ -112,18 +112,6 @@ local function test_name_escape(str)
 	return result
 end
 
----Decode a JavaScript string literal by removing quotes and unescaping
----@param js_string string The string as captured from source (with quotes)
----@return string The decoded string value
-local function parse_test_name_literal(js_string)
-	local ok, decoded = pcall(vim.fn.json_decode, js_string)
-	if not ok then
-		logger.warn("Unable to decode test name ", js_string)
-		return js_string
-	end
-	return decoded
-end
-
 ---Convert escaped test name to a re pattern that will be passed to node test
 ---runner to pinpoint test name
 ---@param test_pattern string
@@ -226,7 +214,7 @@ function adapter.discover_positions(file_path)
 		-- Building position_id, decoding JavaScript string literals (remove quotes and unescape)
 		position_id = function(position, parents)
 			if position.name then
-				position.name = parse_test_name_literal(position.name)
+				position.name = util.decode_js_string_literal(position.name)
 			end
 
 			local parts = { position.path }
@@ -325,6 +313,7 @@ end
 ---@param result neotest.StrategyResult
 ---@param tree neotest.Tree
 ---@return table<string, neotest.Result>
+---@diagnostic disable-next-line: unused-local
 function adapter.results(spec, result, tree)
 	local parser = spec.context.parser
 	assert(parser, "Unable to extract reporter parser for test results retrieval from test context")
