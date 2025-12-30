@@ -20,7 +20,6 @@ describe("YamlDiagnosticsParser", function()
         Test.start (node:internal/test_runner/test:1003:17)
         startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17)
     ]]
-		-- TODO: literal expansion
 		local WANT_ERROR_MSG = "Must be an int"
 		local WANT_ERROR_LINE_NUM = 7
 
@@ -61,7 +60,6 @@ describe("YamlDiagnosticsParser", function()
         async Suite.run (node:internal/test_runner/test:1516:7)
         async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)
     ]]
-		-- TODO: literal expansion
 		local WANT_ASSERTION_MSG = [['<p>Hi-- &lt;br /&gt; there!</p>' == '<p>Hi &lt;br /&gt; there!</p>']]
 		local WANT_ASSERT_LINE_NUM = 9
 

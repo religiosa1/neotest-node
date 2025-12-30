@@ -2,7 +2,6 @@
 -- https://github.com/nodejs/node/blob/main/lib/internal/test_runner/reporter/tap.js
 -- The tapEscape() function escapes: # \ \n \t \r \f \b \v
 
-local logger = require("neotest.logging")
 local util = require("neotest-node.util")
 local YamlDiagnosticsParser = require("neotest-node.yaml-diagnostics-parser")
 
@@ -185,16 +184,11 @@ function TapParser:parse_general_line(line)
 		end
 		local payload, comment = split_comment(stripped)
 		local test_name = get_test_name(payload)
-		if not test_name then
-			logger.warn(
-				string.format("Unable to parse test name from test line, on line %d of tap file", self.tap_line_number)
-			)
-		else
-			self.current_test_name = test_name
-			self.results[self:make_position_id(test_name)] = {
-				status = get_result_status(stripped, comment),
-			}
-		end
+		assert(test_name, "No test name extracted from a test result line")
+		self.current_test_name = test_name
+		self.results[self:make_position_id(test_name)] = {
+			status = get_result_status(stripped, comment),
+		}
 		return
 	end
 end
