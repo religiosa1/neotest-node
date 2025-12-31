@@ -10,6 +10,7 @@ local adapter = { name = "neotest-node" }
 ---@field cwd? string | fun(position_path: string): string?
 ---@field filter_dir? fun(name: string, rel_path: string, root: string): boolean
 ---@field is_test_file? fun(file_path: string): boolean
+---@field args? string[] | fun(args: neotest.RunArgs): string[]
 
 ---@return table<string, string>
 local getEnv = function()
@@ -19,6 +20,11 @@ end
 ---@type fun(position_path: string): string?
 local getCwd = function(position_path)
 	return adapter.root(position_path)
+end
+
+---@type fun(args: neotest.RunArgs): string[]
+local getArgs = function()
+	return {}
 end
 
 setmetatable(adapter, {
@@ -46,6 +52,14 @@ setmetatable(adapter, {
 
 		if vim.is_callable(opts.is_test_file) then
 			adapter.is_test_file = opts.is_test_file
+		end
+
+		if vim.is_callable(opts.args) then
+			getArgs = opts.args --[[@as fun(neotest.RunArgs):string[] ]]
+		elseif opts.args then
+			getArgs = function()
+				return opts.args
+			end
 		end
 
 		return adapter
@@ -79,7 +93,10 @@ function adapter.is_test_file(file_path)
 	-- technically, node doesn't support tsx files at the moment, but user could
 	-- provide some importer (e.g. tsx) in args, so we're including tsx/jsx files
 	-- as well.
-	if file_path:match(".*%.test%.[cm]?[tj]sx?$") == nil then
+	if
+		file_path:match(".*%.test%.[cm]?[tj]sx?$") == nil --
+		and file_path:match(".*%.test%.[cm]?[tj]sx?$") == nil
+	then
 		return false
 	end
 	return util.has_node_test_imports(file_path)
@@ -225,7 +242,7 @@ function adapter.discover_positions(file_path)
 	return positions
 end
 
----@param strategy string
+---@param strategy string strategy name
 ---@param command string[]
 ---@param cwd string?
 ---@return table?
@@ -263,6 +280,8 @@ function adapter.build_spec(args)
 		"--test-reporter",
 		"tap",
 	}
+	vim.list_extend(command, getArgs(args))
+
 	if position.type == "test" or position.type == "namespace" then
 		local name_pattern = convert_test_name_to_node_re(position.name)
 		vim.list_extend(command, {
