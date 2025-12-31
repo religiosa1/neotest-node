@@ -2,7 +2,6 @@
 
 Neovim [Neotest](https://github.com/nvim-neotest/neotest) adapter for [node test runner](https://nodejs.org/api/test.html)
 
-
 https://github.com/user-attachments/assets/e492aba8-41f8-4e1d-9306-39f785b3d742
 
 This isn't for running jest or vitest tests, but node built-in test runner tests
@@ -16,7 +15,7 @@ add `--experimental-strip-types` to args)
 - run node test runner tests and suites from your nvim;
 - test results streaming - your results will appear in the UI one by one as
   they're processed by the node;
-- detection of imports coming from
+- [detection](#node-test-detection) of imports coming from
   `node:test`, so the plugin plays along nicely with your existing
   vitest/jest/bun adapter setup and doesn't trigger on foreign tests;
 - DAP debugger connection;
@@ -112,6 +111,10 @@ return {
 ```
 
 ## Implementation details
+
+Plugin is running `node --test --test-reporter tap` for the selected file/
+test pattern, and then parses node test runner [TAP](https://testanything.org/)
+output to report results and capture potential error messages + error lines.
 
 ### Node test detection
 
