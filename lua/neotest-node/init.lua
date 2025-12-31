@@ -11,8 +11,6 @@ local adapter = { name = "neotest-node" }
 ---@field filter_dir? fun(name: string, rel_path: string, root: string): boolean
 ---@field is_test_file? fun(file_path: string): boolean
 
-local all_tests_shell_pattern = "*.{test,spec}.{js,ts}"
-
 ---@return table<string, string>
 local getEnv = function()
 	return {}
@@ -263,6 +261,10 @@ function adapter.build_spec(args)
 	end
 	local position = args.tree:data()
 
+	if position.type == "dir" then
+		return nil -- let neotest break down dir by files
+	end
+
 	local command = {
 		"node",
 		"--test",
@@ -279,11 +281,8 @@ function adapter.build_spec(args)
 		})
 	elseif position.type == "file" then
 		table.insert(command, position.path)
-	elseif position.type == "dir" then
-		-- TODO: this will require custom reporter for node -- extension for
-		-- TAP reporter, that also gives info on locations
-		assert(false, "DIR tests are not supported yet")
-		table.insert(command, position.path .. "/" .. all_tests_shell_pattern)
+	else
+		error(string.format("Unknown test positions type: %s", position.type))
 	end
 
 	local cwd = getCwd(position.path)
