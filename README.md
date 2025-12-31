@@ -2,6 +2,9 @@
 
 Neovim [Neotest](https://github.com/nvim-neotest/neotest) adapter for [node test runner](https://nodejs.org/api/test.html)
 
+
+https://github.com/user-attachments/assets/e492aba8-41f8-4e1d-9306-39f785b3d742
+
 This isn't for running jest or vitest tests, but node built-in test runner tests
 (but it will play along nicely if you have neotest-vitest or neotest-jest).
 
