@@ -120,19 +120,28 @@ function TapParser:parse_line(line)
 	if self.parser_state == parser_state.YamlDiagnostic then
 		if line:match("^%s*...$") then
 			self.parser_state = parser_state.General
-			if self.diagnosticsParser then
-				local position_id = self:make_position_id(self.current_test_name)
-				if self.results[position_id] then
-					self.results[position_id].errors = self.diagnosticsParser:get_errors()
-				end
+			assert(
+				self.diagnosticsParser,
+				string.format(
+					"on closing frontmatter line:%d: no diagnosticsParser initialized, has frontmatter been opened with --- in TAP reporter?",
+					self.tap_line_number
+				)
+			)
+			local position_id = self:make_position_id(self.current_test_name)
+			if self.results[position_id] then
+				self.results[position_id].errors = self.diagnosticsParser:get_errors()
 			end
 			self.diagnosticsParser = nil
 			return
 		else
+			assert(
+				self.diagnosticsParser,
+				string.format("yaml block, line:%d: no diagnosticsParser initialized, NOOP", self.tap_line_number)
+			)
 			self.diagnosticsParser:parse_line(line)
 		end
 	elseif self.parser_state == parser_state.TestResult then
-		if self.parser_state == parser_state.TestResult and line:match("^%s*---$") then
+		if line:match("^%s*---$") then
 			self.parser_state = parser_state.YamlDiagnostic
 			self.diagnosticsParser = YamlDiagnosticsParser.new(self.file_path)
 			return

@@ -46,17 +46,15 @@ function YamlDiagnosticsParser:parse_line(line)
 			self.state = DiagnosticsParserState.General
 		else
 			table.insert(self.stack_trace, stripped)
+			return
 		end
-		return
 	end
 	-- General state parsing
 	local error_msg_literal = stripped:match("^%s*error:%s*(.*)")
 	if error_msg_literal then
 		self.error_message = util.decode_js_string_literal(error_msg_literal)
-		return
 	elseif stripped:match("^stack: [>|][+-]?") then -- YML block scalar
 		self.state = DiagnosticsParserState.StackTrace
-		return
 	end
 end
 

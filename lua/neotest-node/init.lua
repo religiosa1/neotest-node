@@ -72,25 +72,17 @@ function adapter.filter_dir(name, rel_path, root)
 	return name ~= "node_modules"
 end
 
-function adapter.has_node_test_imports(file_path)
-	local file = io.open(file_path, "r")
-	if not file then
-		return false
-	end
-	local content = file:read(2000)
-	file:close()
-	return content
-		and (content:match("from%s+[\"']node:test[\"']") or content:match("require%s*%(%s*[\"']node:test[\"']%s*%)"))
-end
-
 ---@async
 ---@param file_path string
 ---@return boolean
 function adapter.is_test_file(file_path)
-	if file_path:match(".*%.test%.[tj]s$") == nil then
+	-- technically, node doesn't support tsx files at the moment, but user could
+	-- provide some importer (e.g. tsx) in args, so we're including tsx/jsx files
+	-- as well.
+	if file_path:match(".*%.test%.[cm]?[tj]sx?$") == nil then
 		return false
 	end
-	return adapter.has_node_test_imports(file_path)
+	return util.has_node_test_imports(file_path)
 end
 
 --- Tap always applies escaping to control characters to test names, so we're
@@ -298,8 +290,10 @@ function adapter.build_spec(args)
 		stream = function(output_stream)
 			return function()
 				local new_lines = output_stream()
-				for _, line in ipairs(new_lines) do
-					parser:parse_line(line)
+				if new_lines then
+					for _, line in ipairs(new_lines) do
+						parser:parse_line(line)
+					end
 				end
 				return parser:get_results()
 			end
