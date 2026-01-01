@@ -1,7 +1,7 @@
-const { describe, it } = require("node:test");
+const { describe, it, suite } = require("node:test");
 const { double } = require("./mockFn.js");
 
-describe("top level desc", () => {
+suite("top level desc", () => {
 	describe("nested desc", () => {
 		it("mock failed test", (t) => {
 			const got = double("qwerty");
