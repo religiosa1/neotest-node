@@ -95,7 +95,7 @@ function adapter.is_test_file(file_path)
 	-- as well.
 	if
 		file_path:match(".*%.test%.[cm]?[tj]sx?$") == nil --
-		and file_path:match(".*%.test%.[cm]?[tj]sx?$") == nil
+		and file_path:match(".*%.spec%.[cm]?[tj]sx?$") == nil
 	then
 		return false
 	end

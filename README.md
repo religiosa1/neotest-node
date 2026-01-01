@@ -52,8 +52,8 @@ return {
     },
     opts = {
       -- notice if you also mixed vitest/jest/bun tests in your project, this
-      -- adapter must come first, otherwise other adapters will intercept the
-      -- test file
+      -- adapter most likely must come last, otherwise other adapters will
+      -- intercept the test file
       adapters = { "neotest-node" }
     },
   },
@@ -83,7 +83,7 @@ return {
           ---@type string | fun(position_path: string): string?
           cwd = function(position_path)
             local lib = require("neotest.lib")
-            return lib.files.match_root_pattern("package.json")(dir)
+            return lib.files.match_root_pattern("package.json")(position_path)
           end,
           ---Filtering out dirs from tests detection
           ---@type fun(name: string, rel_path: string, root: string): boolean
@@ -94,7 +94,7 @@ return {
           ---@type fun(file_path: string): boolean
           is_test_file = function (file_path)
           	if file_path:match(".*%.test%.[cm]?[tj]sx?$") == nil
-              and file_path:match(".*%.test%.[cm]?[tj]sx?$") == nil then
+              and file_path:match(".*%.spec%.[cm]?[tj]sx?$") == nil then
               return false
             end
             local util = require("neotest-node.util")
@@ -126,9 +126,6 @@ testrunner in dependencies, while bun can check for bun lockfile.
 We don't have this option, as node test runner won't be present in deps -- it
 comes out of the box.
 
-This detection must happen in `is_test_file` adapter function -- neotest passes
-test execution to the first adapter matched by its is_test_file function.
-
 So instead of inspecting package.json (which isn't required for this adapter),
 if the file has the correct extension (e.g. `foo.test.ts` or `bar.spec.js`)
 we're reading the first 2000 chars from the file and trying to find an import
@@ -136,6 +133,18 @@ from `node:test` with a regex (be that CJS or ESM import).
 
 We're using regex instead of treesitter, to avoid extra overhead of parsing
 every test files just to determine if we should anything with a file.
+
+This detection must happen in `is_test_file` adapter function -- neotest passes
+test execution to the first adapter matched by its is_test_file function.
+Iteration over adapters [is performed](https://github.com/nvim-neotest/neotest/blob/deadfb1af5ce458742671ad3a013acb9a6b41178/lua/neotest/client/init.lua#L340)
+with `pairs()` call over object, so order of adapters matter but not guaranteed.
+Most likely neotest-node must come last in your adapters list. If you still
+experience problems with adapter order matching, you can try explicitly
+checking in your other adapters for a node test with
+
+```lua
+require("neotest-node.util").has_node_test_imports(file_path)
+```
 
 If you want to disable this functionality you can pass your custom `is_test_file`
 in the adapter options in your config, e.g.:
