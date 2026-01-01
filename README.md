@@ -33,9 +33,9 @@ add `--experimental-strip-types` to args)
     });
   }
   ```
-- template strings and any kind of string manipulation in test/describe names,
+- template strings and any kind of string manipulation in test/suite names,
   tests must be statically analyzable
-- import renames of it/test/describe -- why would you do that?..
+- import renames of it/test/describe/suite -- why would you do that?..
 
 ## Installation
 

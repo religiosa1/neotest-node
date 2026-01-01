@@ -154,26 +154,28 @@ function adapter.discover_positions(file_path)
 	-- escape literals, which will break string into multiple fragments
 	local query = [[
 ; -- Namespaces --
-; Matches: `describe('context', () =>{})
+; Matches: `describe('ctx', () =>{})` / `suite('ctx', () => {}`
 ((call_expression
-  function: (identifier) @func_name (#eq? @func_name "describe")
+  function: (identifier) @func_name (#any-of? @func_name "describe" "suite")
   arguments: (arguments
     (string) @namespace.name
     (arrow_function)
   )
 )) @namespace.definition
+
+; Matches: `describe('ctx', function () {})` / `suite('ctx', function () {})`
 ((call_expression
-  function: (identifier) @func_name (#eq? @func_name "describe")
+  function: (identifier) @func_name (#any-of? @func_name "describe" "suite")
   arguments: (arguments
     (string) @namespace.name
     (function_expression)
   )
 )) @namespace.definition
 
-; Matches: `describe.only('context', () =>{})`
+; Matches: `describe.only('ctx', () =>{})` / `describe.suite('ctx', () => {})` 
 ((call_expression
   function: (member_expression
-    object: (identifier) @func_name (#any-of? @func_name "describe")
+    object: (identifier) @func_name (#any-of? @func_name "describe" "suite")
   )
   arguments: (arguments
     (string) @namespace.name
@@ -181,9 +183,10 @@ function adapter.discover_positions(file_path)
   )
 )) @namespace.definition
 
+; Matches: `describe.only('ctx', function () {})` / `describe.suite('ctx', function () {})` 
 ((call_expression
   function: (member_expression
-    object: (identifier) @func_name (#any-of? @func_name "describe")
+    object: (identifier) @func_name (#any-of? @func_name "describe" "suite")
   )
   arguments: (arguments
     (string) @namespace.name
