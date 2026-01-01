@@ -20,7 +20,7 @@ add `--experimental-strip-types` to args)
   vitest/jest/bun adapter setup and doesn't trigger on foreign tests;
 - DAP debugger connection;
 - Typescript and JS test suites;
-- environment and [global setup/teardown](https://nodejs.org/api/test.html#global-setup-and-teardown) parameters;
+- environment and args parameters (e.g. for setting up [global setup/teardown](https://nodejs.org/api/test.html#global-setup-and-teardown))
 - output capture for you to see your console.logs and stuff run in a test;
 
 ### Not supported
