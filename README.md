@@ -79,7 +79,7 @@ return {
           env = function()
             return {}
           end,
-          ---Command (`node --test`) current working dir
+          ---Test command (`node --test`) current working dir
           ---@type string | fun(position_path: string): string?
           cwd = function(position_path)
             local lib = require("neotest.lib")
@@ -100,7 +100,7 @@ return {
             local util = require("neotest-node.util")
             return util.has_node_test_imports(file_path)
           end,
-          ---Command (`node --test`) additional arguments
+          ---Test command additional arguments
           ---@type string[] | fun(args: neotest.RunArgs): string[]
           args = {},
         }
@@ -132,22 +132,24 @@ we're reading the first 2000 chars from the file and trying to find an import
 from `node:test` with a regex (be that CJS or ESM import).
 
 We're using regex instead of treesitter, to avoid extra overhead of parsing
-every test files just to determine if we should anything with a file.
+every test files just to determine if we should do anything with a file.
 
 This detection must happen in `is_test_file` adapter function -- neotest passes
-test execution to the first adapter matched by its is_test_file function.
+test execution to the first adapter matched by its `is_test_file` function.
 Iteration over adapters [is performed](https://github.com/nvim-neotest/neotest/blob/deadfb1af5ce458742671ad3a013acb9a6b41178/lua/neotest/client/init.lua#L340)
 with `pairs()` call over object, so order of adapters matter but not guaranteed.
-Most likely neotest-node must come last in your adapters list. If you still
-experience problems with adapter order matching, you can try explicitly
-checking in your other adapters for a node test with
+Most likely neotest-node must come last in your adapters list, but may require
+some tinkering. If you still experience problems with adapter order matching,
+you can try explicitly checking in your other adapters (i.e. jest or vitest)
+`is_test_file` function for a node test with
 
 ```lua
 require("neotest-node.util").has_node_test_imports(file_path)
 ```
 
-If you want to disable this functionality you can pass your custom `is_test_file`
-in the adapter options in your config, e.g.:
+If you want to disable this functionality completely (in cases you don't have
+any other js/ts adapters besides this one) you can pass your custom
+`is_test_file` in the adapter options in your config, e.g.:
 
 ```lua
 -- opts in config:
